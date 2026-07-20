@@ -1,89 +1,103 @@
 # Theory of Operations
 
-<!--
-  TODO: Replace this stub with a real theory-of-operations document for
-  `metalsmith-section-pages` before the first non-trivial release. The headings
-  below are a starting point — keep, drop, or rename them to fit the
-  plugin. The point of this document is to capture the *why* of the
-  design so future maintainers (including you, six months from now)
-  don't have to re-derive it from the code.
-
-  A good model is `metalsmith-seo`'s docs/THEORY.md. While the stub
-  exists, the MCP validator will flag this plugin as needing work.
--->
-
-This document explains how `metalsmith-section-pages` functions and why it is
-built this way. Read this once before making non-trivial changes to the
-plugin.
+This document explains how `metalsmith-section-pages` functions and why
+it is built this way. Read this once before making non-trivial changes
+to the plugin.
 
 ---
 
 ## 1. The job
 
-<!--
-  TODO: In a few short paragraphs, describe what this plugin does in
-  terms of the Metalsmith pipeline. What does it consume from the
-  `files` object and `metalsmith.metadata()`? What does it produce or
-  mutate? What does it deliberately *not* do? Anchor the reader in
-  concrete inputs and outputs before getting into architecture.
--->
+The plugin turns an array of data records into virtual source files in
+the structured-content format: a frontmatter-equivalent metadata object
+whose `sections` array is composed of component-library sections. It
+reads records from `metalsmith.metadata()[source]` (or an injected
+async function) and writes one entry per record into the `files`
+object, with empty `contents` and the page definition as metadata.
 
-## 2. Architecture
+It deliberately does not fetch data (that is a data-loading concern
+with its own failure modes: auth, caching, timeouts), does not render
+anything (layouts do that), and does not know any section type by name
+(the component manifests are the only source of truth).
 
-<!--
-  TODO: Sketch the module layout (a tree of `src/` is usually enough)
-  and describe the role of each layer. Call out which layers are pure
-  and which are side-effecting. If the plugin is small enough that this
-  feels like overkill, say so and skip to section 3 — but at least name
-  the entry point and any helpers worth knowing about.
--->
+The origin is a nonprofit class site where a Google Sheet, exposed
+through an Apps Script web app, drives class pages. The site-specific
+predecessor hand-rolled section objects with helper functions and
+hoped they matched the components. This plugin replaces the hope with
+the library's own contracts.
 
-## 3. Data flow
+## 2. The central idea: manifests as the API
 
-<!--
-  TODO: Trace what happens to a single file (or unit of work) from the
-  moment the plugin is invoked to the moment it returns. An ASCII
-  diagram is fine. Highlight any place where order matters or where
-  data is normalized between stages.
--->
+Component libraries in the nunjucks-components family describe each
+component twice in machine-readable form: a `fields` block (the
+authorable form schema, with defaults and `$use`/`$extends`
+composition) and a `validation` block (what an instance must look
+like). The bundler (`metalsmith-bundled-components`) already contains
+the canonical code for both: `resolveFields` composes field trees, and
+`validateSection` enforces validation blocks at build time.
 
-## 4. Design invariants
+This plugin reuses both through the bundler's subpath exports
+(`metalsmith-bundled-components/schema` and `/validation`, added in
+1.3.0) rather than reimplementing them. That is a deliberate
+single-source-of-truth decision: a section this plugin constructs is
+valid by exactly the rules the build enforces, and when the bundler's
+semantics evolve, this plugin follows automatically. The one piece
+implemented here is `materializeDefaults` (fields tree to defaults
+object), which mirrors the semantics of the library's
+schema-consistency tests: leaves emit their declared `default`, array
+and multiselect widgets emit `[]`, checkboxes emit `false`, everything
+else emits `''`.
 
-<!--
-  TODO: List the rules that must hold for the plugin to behave
-  correctly, and *why* each one exists. Examples: "all HTML rewrites
-  go through utils/html-injector.js, never regex"; "the config merge
-  happens in exactly one place"; "errors are aggregated and thrown
-  once at the end of the batch." Each invariant should name the file
-  or function that enforces it.
--->
+## 3. The section builder
 
-## 5. Deliberate non-features
+`section(type, overrides)` is the API the site's mapping function
+uses. It materializes the manifest's defaults (cached per type,
+deep-cloned per call so instances never share objects), deep-merges
+the overrides (objects merge, arrays and scalars replace), re-asserts
+`sectionType`, and validates. Structural keys every section carries
+(`containerTag`, `classes`, `id`, `isDisabled`) are seeded before the
+manifest defaults so they exist even for manifests that do not
+`$extends` commons; when commons is extended, its declared defaults
+win.
 
-<!--
-  TODO: Document things that have been considered and rejected, with
-  the reasoning. This is how you stop a future maintainer (or AI
-  assistant) from re-introducing a "missing" feature that was
-  intentionally left out. If nothing has been declined yet, leave a
-  note that this section will grow as decisions accumulate.
--->
+Validation throws rather than warns. The mapping function runs at
+build time with author-controlled data; a wrong value is a bug in the
+mapping or the payload, and the error message (component name, dotted
+property path, expected values) is the debugging surface.
 
-## 6. Testing notes
+## 4. The generation pass
 
-<!--
-  TODO: Describe the testing philosophy for this plugin. What kind of
-  fixtures does it use? Are tests hermetic (in-memory file objects) or
-  fixture-directory-based? What's the policy on mocking? (Default for
-  Metalsmith plugins: never mock Metalsmith itself — use a real
-  instance. The plugin's contract is with the real framework.)
--->
+For each record, `path(record, index)` names the file and
+`page(record, { section })` builds the page object. The plugin
+enforces the invariants that data-driven generation tends to violate
+silently:
 
-## 7. Known sharp edges
+- duplicate generated paths (unstable or colliding record ids) fail
+  the build, naming the path;
+- a generated path that collides with a real source file fails, so a
+  record can never shadow hand-written content;
+- every `sections` array is validated with `validateSections`, even
+  hand-assembled objects that bypassed the builder;
+- a missing or non-array records source fails with a pointer to the
+  likely cause (data plugin not run yet).
 
-<!--
-  TODO: Document non-obvious gotchas a maintainer needs to know:
-  ordering constraints with other plugins, dependency quirks,
-  whitespace sensitivities, places where two passes share state, etc.
-  If you discover one while debugging, add it here so the next person
-  doesn't have to rediscover it.
--->
+Generated files get `layout` from options (overridable per page) and
+empty contents; everything else on the page object passes through
+untouched, so `seo`, `card`, `bodyClasses`, or anything a site's
+layouts read works without this plugin knowing about it.
+
+The component map is loaded fresh each run, so watch-mode edits to
+manifests are picked up; the per-type defaults cache lives inside one
+run only.
+
+## 5. What stays outside
+
+Fetching is the site's business (or a future companion plugin): auth
+tokens, TTL caches, and timeout budgets have nothing to do with page
+generation, and coupling them would force every consumer to adopt one
+transport. The record-to-sections mapping is inherently application
+code; no schema can decide which sections best present a class versus
+an event versus a product. And the data source itself is held to a
+written contract (docs/data-provider-contract.md) covering stable ids,
+ISO text dates, publication gating, determinism, and failure
+semantics, so the provider and the site can evolve independently.

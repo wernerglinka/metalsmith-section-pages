@@ -8,9 +8,28 @@
 
 > Generate structured-content pages composed of validated library sections from data records
 
-## Features
+Turns data records (from a spreadsheet API, a headless CMS, a JSON
+file, anything that produces an array) into pages built from a
+component library's sections, the structured-content format used by
+[nunjucks-components](https://github.com/wernerglinka/nunjucks-components)
+and the Metalsmith2025 structured-content starter. Generated pages
+flow through the normal pipeline: layouts, permalinks, and the
+component bundler treat them exactly like hand-written pages.
 
-Add features here...
+The heart of the plugin is a manifest-aware section builder. Your
+mapping function writes
+
+```js
+section('hero', { text: { title: record.title, titleTag: 'h1' } })
+```
+
+and the builder materializes every other property from the component's
+own `manifest.json` fields block (including `$use` and `$extends`
+composition), merges your overrides, and validates the result against
+the manifest's validation block. The plugin does not know what a hero
+is; it reads the manifests. A new section in the library is
+constructible the moment its manifest lands, and a bad record fails
+the build with a path-precise error instead of rendering wrong.
 
 ## Installation
 
@@ -18,20 +37,47 @@ Add features here...
 npm install metalsmith-section-pages
 ```
 
-## Requirements
-
-Add requirements here...
+Requires `metalsmith-bundled-components` >= 1.3.0 as a peer dependency
+(its schema and validation utilities are the single source of truth
+for what sections accept; any site using a section component library
+already has it).
 
 ## Usage
+
+Records are loaded into metadata by any earlier step (a fetch plugin,
+a data file loader, inline code), then this plugin maps each record to
+a page:
 
 ```js
 import Metalsmith from 'metalsmith';
 import sectionPages from 'metalsmith-section-pages';
 
 Metalsmith(import.meta.dirname)
-  .use(sectionPages({
-    // options
-  }))
+  .use(loadClassData()) // puts an array at metadata.classes
+  .use(
+    sectionPages({
+      source: 'classes',
+      path: (record) => `classes/${record.id}.md`,
+      page: (record, { section }) => ({
+        seo: { title: record.title, description: record.summary },
+        card: { title: record.title, date: record.firstDate },
+        sections: [
+          section('hero', {
+            text: { title: record.title, titleTag: 'h1', prose: record.summary }
+          }),
+          section('multi-media', {
+            mediaType: 'iframe',
+            isReverse: true,
+            iframe: { src: record.registrationUrl, title: 'Registration form', allow: 'payment' },
+            text: { title: 'What to expect', prose: record.whatToExpect },
+            disclosures: [
+              { title: 'Cancellation policy', prose: record.cancellationPolicy }
+            ]
+          })
+        ]
+      })
+    })
+  )
   .build((err) => {
     if (err) throw err;
   });
@@ -41,196 +87,61 @@ Metalsmith(import.meta.dirname)
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `pattern` | `string \| string[]` | `'**/*'` | Pattern to match files. Uses Metalsmith's native pattern matching. |
-| `ignore` | `string \| string[]` | `[]` | Patterns to ignore files. |
+| `source` | `string \| function` | `'records'` | Metadata key holding the records array, or an async function `(metalsmith) => records` |
+| `path` | `function` | (required) | `(record, index) => string`: repo-relative file path for the generated page |
+| `page` | `function` | (required) | `(record, helpers) => page object` with a `sections` array; may be async. `helpers` is `{ section }` |
+| `componentsPath` | `string` | `'lib/layouts/components'` | Directory holding `_partials/` and `sections/` with their manifest.json files |
+| `layout` | `string` | `'pages/sections.njk'` | Layout for generated pages; a page object may override it per page |
 
-## How It Works
+## The section builder
 
-Add how it works explanation here...
+`section(type, overrides)`:
 
-## Examples
+1. Loads the component's manifest and resolves its `fields` block with
+   the bundler's own resolver (`$use` pulls in a partial's fields,
+   `$extends` merges shared blocks like `commons`).
+2. Materializes defaults: the data a fresh authoring form would emit.
+3. Deep-merges your overrides (objects merge, arrays and scalars
+   replace).
+4. Validates the merged section with the bundler's own
+   `validateSection`, the same code the build runs. Failures throw
+   with the component's error message, naming the exact property.
 
-Add examples here...
+Hand-assembled section objects in the `sections` array are validated
+too, so every generated page is held to the manifests no matter how it
+was constructed.
 
-### Basic Usage
+## Errors are the API
 
-```js
-import Metalsmith from 'metalsmith';
-import sectionPages from 'metalsmith-section-pages';
+Everything about a data-driven site build that can go quietly wrong is
+turned into a build failure with a specific message: a missing records
+array, an unknown section type (listing the known ones), an invalid
+property value (with its dotted path), duplicate record ids, a
+generated path colliding with a real source file.
 
-Metalsmith(import.meta.dirname)
-  .source('./src')
-  .destination('./build')
-  .use(sectionPages())
-  .build((err) => {
-    if (err) throw err;
-    console.log('Build complete!');
-  });
-```
+## Writing a data provider
 
-### With Options
-
-```js
-import Metalsmith from 'metalsmith';
-import sectionPages from 'metalsmith-section-pages';
-
-Metalsmith(import.meta.dirname)
-  .source('./src')
-  .destination('./build')
-  .use(sectionPages({
-    pattern: ['**/*.html', '**/*.md'],
-    ignore: ['drafts/**/*']
-  }))
-  .build((err) => {
-    if (err) throw err;
-  });
-```
-
+If you are building the API that feeds this plugin, read
+[docs/data-provider-contract.md](docs/data-provider-contract.md). It
+covers stable ids, ISO dates as text, publication gating, determinism,
+failure semantics, and the content/presentation boundary, each learned
+from a production sheet-driven site.
 
 ## Debug
 
-To enable debug logs, set the DEBUG environment variable to `metalsmith-section-pages*`:
-
-```javascript
-metalsmith.env('DEBUG', 'metalsmith-section-pages*');
-```
-
-## CLI Usage
-
-Add CLI usage instructions here...
-
-## Testing and Coverage
-
 ```bash
-# Run tests
-npm test
-
-# Generate coverage report
-npm run test:coverage
-
-# View HTML coverage report
-open coverage/index.html
+DEBUG=metalsmith-section-pages metalsmith
 ```
-
-This project maintains 80% code coverage across branches, lines, functions, and statements.
-
-## Automated CI/CD
-
-This plugin includes professional GitHub workflows for automated quality assurance:
-
-### GitHub Actions Workflows
-
-- **`.github/workflows/test.yml`**: Runs on every push and pull request
-  - Automated testing across Node.js versions
-  - Coverage calculation and badge updates
-  - Automatic README updates with coverage percentages
-
-- **`.github/workflows/claude-code.yml`**: AI-assisted code review
-  - Automatic code review on pull requests
-  - Integration with Claude Code for intelligent feedback
-  - Requires `ANTHROPIC_API_KEY` secret in repository settings
-
-### Coverage Badges
-
-Coverage badges are automatically updated by the test workflow. The badge color changes based on coverage percentage:
-- 90%+ = bright green
-- 80-89% = green  
-- 70-79% = yellow-green
-- 60-69% = yellow
-- 50-59% = orange
-- <50% = red
-
-## Release Management
-
-This plugin uses an improved release system that generates professional GitHub releases:
-
-- **Clean Release Notes**: Each release shows only relevant changes
-- **Automatic Formatting**: Proper GitHub markdown with commit links
-- **Full Changelog Links**: Easy access to detailed comparisons
-- **Consistent Quality**: No more messy "Unreleased" sections
-
-Release process:
-
-```bash
-npm run release:patch  # Bug fixes (1.2.3 → 1.2.4)
-npm run release:minor  # New features (1.2.3 → 1.3.0)
-npm run release:major  # Breaking changes (1.2.3 → 2.0.0)
-```
-
-### Writing Commit Messages for Rich Release Notes
-
-Since release notes are auto-generated from commit messages, write detailed commits that clearly explain what changed and why:
-
-**Good Examples:**
-```bash
-feat: add HTML attribute minification support
-
-- Implement advanced attribute optimization algorithm
-- Add support for preserving custom elements
-- Improve processing performance by 40% on large files
-- Add configuration option for selective attribute handling
-
-Closes #123, resolves #124
-```
-
-```bash
-fix: resolve nested script tag processing issue
-
-- Fix edge case where nested script tags caused parsing errors
-- Add comprehensive test coverage for complex HTML structures
-- Improve error messages for malformed HTML
-- Update documentation with troubleshooting guide
-
-Fixes #156
-```
-
-```bash
-docs: update usage examples with new API patterns
-
-- Add async/await examples for modern JavaScript patterns
-- Include TypeScript usage examples
-- Update configuration options table
-- Add troubleshooting section for common issues
-```
-
-**Commit Message Format:**
-- **type**: Brief description (50 chars or less)
-- **body**: Detailed explanation with bullet points
-- **footer**: Issue references and breaking change notices
-
-**Commit Types:**
-- `feat:` New features or enhancements
-- `fix:` Bug fixes
-- `docs:` Documentation updates
-- `perf:` Performance improvements
-- `refactor:` Code refactoring without functional changes
-- `test:` Test additions or modifications
-- `build:` Build system or dependency changes
-
-**Why This Matters:**
-- Each commit message becomes a release note entry
-- Users see exactly what changed and the impact
-- Links to issues/PRs are preserved in GitHub releases
-- Breaking changes are clearly documented
-- Professional release notes are generated automatically
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ## License
 
-MIT © [Your Name](https://github.com/yourusername)
+MIT © [Werner Glinka](https://github.com/wernerglinka)
 
 [metalsmith-badge]: https://img.shields.io/badge/metalsmith-plugin-green.svg?longCache=true
 [metalsmith-url]: https://metalsmith.io
 [npm-badge]: https://img.shields.io/npm/v/metalsmith-section-pages.svg
 [npm-url]: https://www.npmjs.com/package/metalsmith-section-pages
-[license-badge]: https://img.shields.io/github/license/yourusername/metalsmith-section-pages
+[license-badge]: https://img.shields.io/github/license/wernerglinka/metalsmith-section-pages
 [license-url]: LICENSE
 [coverage-badge]: https://img.shields.io/badge/test%20coverage-100.0%25-brightgreen
-[coverage-url]: https://github.com/yourusername/metalsmith-section-pages/actions/workflows/test.yml
+[coverage-url]: https://github.com/wernerglinka/metalsmith-section-pages/actions/workflows/test.yml
