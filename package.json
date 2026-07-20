@@ -1,0 +1,52 @@
+{
+  "name": "metalsmith-section-pages",
+  "version": "0.1.0",
+  "description": "Generate structured-content pages composed of validated library sections from data records",
+  "keywords": [
+    "metalsmith",
+    "metalsmith-plugin"  ,
+    "metadata-generation"  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wernerglinka/metalsmith-section-pages"
+  },
+  "bugs": {
+    "url": "https://github.com/wernerglinka/metalsmith-section-pages/issues"
+  },
+  "homepage": "https://github.com/wernerglinka/metalsmith-section-pages",
+  "license": "MIT",
+  "author": "Werner Glinka <werner@glinka.co>",
+  "type": "module",
+  "exports": "./src/index.js",
+  "files": ["src/**/*.js", "LICENSE", "README.md"],
+  "scripts": {
+    "changelog": "auto-changelog -u --commit-limit false --ignore-commit-pattern '^((dev|chore|ci):|Release)'",
+    "test": "node --test --test-timeout=15000 'test/**/*.test.js'",
+    "coverage": "mkdir -p coverage && node --test --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test-timeout=15000 'test/**/*.test.js'",
+    "test:coverage": "npm run coverage",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome check --write .",
+    "lint:check": "biome check .",
+    "pre-release": "npm run lint:check && npm run format:check && npm test && npx metalsmith-plugin-mcp-server validate .",
+    "release:patch": "./scripts/release.sh patch --ci",
+    "release:minor": "./scripts/release.sh minor --ci",
+    "release:major": "./scripts/release.sh major --ci",
+    "release:check": "npm run lint:check && release-it --dry-run",
+    "depcheck": "depcheck"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.12",
+    "auto-changelog": "^2.5.0",
+    "depcheck": "^1.4.0",
+    "metalsmith": "^2.5.0",
+    "release-it": "^20.0.0"
+  },
+  "engines": {
+    "node": ">= 22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
