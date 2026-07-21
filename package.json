@@ -47,7 +47,7 @@
     "depcheck": "^1.4.0",
     "metalsmith": "^2.5.0",
     "release-it": "^20.0.0",
-    "metalsmith-bundled-components": "file:../metalsmith-bundled-components"
+    "metalsmith-bundled-components": "^1.3.0"
   },
   "engines": {
     "node": ">= 22.0.0"

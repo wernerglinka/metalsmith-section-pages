@@ -8,6 +8,8 @@
 
 > Generate structured-content pages composed of validated library sections from data records
 
+> **This plugin is a fully functional proof-of-concept.** However, it is not yet fully tested and may contain bugs. Use with caution.
+
 Turns data records (from a spreadsheet API, a headless CMS, a JSON
 file, anything that produces an array) into pages built from a
 component library's sections, the structured-content format used by
