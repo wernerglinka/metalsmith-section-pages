@@ -4,6 +4,7 @@
 [![npm: version][npm-badge]][npm-url]
 [![license: MIT][license-badge]][license-url]
 [![test coverage][coverage-badge]][coverage-url]
+[![ESM][modules-badge]][npm-url]
 [![Known Vulnerabilities](https://snyk.io/test/npm/metalsmith-section-pages/badge.svg)](https://snyk.io/test/npm/metalsmith-section-pages)
 
 > Generate structured-content pages composed of validated library sections from data records
@@ -147,3 +148,4 @@ MIT © [Werner Glinka](https://github.com/wernerglinka)
 [license-url]: LICENSE
 [coverage-badge]: https://img.shields.io/badge/test%20coverage-96%25-brightgreen
 [coverage-url]: https://github.com/wernerglinka/metalsmith-section-pages/actions/workflows/test.yml
+[modules-badge]: https://img.shields.io/badge/module-ESM-blue
