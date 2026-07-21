@@ -29,6 +29,18 @@ fi
 
 echo "Starting $RELEASE_TYPE release..."
 
+# Sync with the remote before releasing. release-it bumps the version,
+# writes the changelog, commits, and tags locally, then pushes the
+# release commit and tag at the very end. If origin has moved ahead in
+# the meantime (e.g. the CI coverage-badge bot pushes to main), that
+# final push is rejected as non-fast-forward and the release is left
+# half-done. Rebasing our local commits onto the remote first keeps the
+# push fast-forwardable. Requires a clean working tree, which release-it
+# enforces anyway; a conflict here aborts the release via `set -e`.
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+echo "Syncing with origin/$BRANCH..."
+git pull --rebase origin "$BRANCH"
+
 # Clear any existing GITHUB_TOKEN that might interfere with gh CLI authentication
 unset GITHUB_TOKEN
 
