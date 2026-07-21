@@ -1,0 +1,55 @@
+{
+  "name": "hero",
+  "type": "section",
+  "styles": ["hero.css"],
+  "scripts": [],
+  "requires": ["text", "ctas", "commons"],
+  "validation": {
+    "required": ["sectionType"],
+    "properties": {
+      "sectionType": {
+        "type": "string",
+        "const": "hero"
+      },
+      "isFullScreen": {
+        "type": "boolean"
+      },
+      "containerTag": {
+        "type": "string",
+        "enum": ["section", "article", "aside", "div"]
+      },
+      "text.titleTag": {
+        "type": "string",
+        "enum": ["h1", "h2", "h3", "h4", "h5", "h6"]
+      },
+      "ctas": {
+        "type": "array",
+        "items": {
+          "properties": {
+            "isButton": {
+              "type": "boolean"
+            },
+            "buttonStyle": {
+              "type": "string",
+              "enum": ["primary", "secondary", "tertiary", "inverted"]
+            }
+          }
+        }
+      }
+    }
+  },
+  "fields": {
+    "isFullScreen": {
+      "widget": "checkbox",
+      "label": "Full screen",
+      "default": false
+    },
+    "text": {
+      "$use": "text"
+    },
+    "ctas": {
+      "$use": "ctas"
+    },
+    "$extends": ["commons"]
+  }
+}

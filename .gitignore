@@ -1,11 +1,12 @@
 # Dependencies
 node_modules/
 
-# Build output
-lib/
-dist/
-build/
-out/
+# Build output (repo-root only; must not match test fixtures like
+# test/fixtures/site/lib/layouts/components)
+/lib/
+/dist/
+/build/
+/out/
 
 # Test coverage
 coverage/
