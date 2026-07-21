@@ -145,5 +145,5 @@ MIT © [Werner Glinka](https://github.com/wernerglinka)
 [npm-url]: https://www.npmjs.com/package/metalsmith-section-pages
 [license-badge]: https://img.shields.io/github/license/wernerglinka/metalsmith-section-pages
 [license-url]: LICENSE
-[coverage-badge]: https://img.shields.io/badge/test%20coverage-025-red
+[coverage-badge]: https://img.shields.io/badge/test%20coverage-96%25-brightgreen
 [coverage-url]: https://github.com/wernerglinka/metalsmith-section-pages/actions/workflows/test.yml
